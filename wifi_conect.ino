@@ -9,7 +9,7 @@
 
 #define DHTPIN 2
 #define DHTTYPE DHT11
-#define SOIL_PIN A0 
+#define SOIL_PIN A0
 
 DHT dht(DHTPIN, DHTTYPE);
 Adafruit_AHTX0 aht;
@@ -62,10 +62,10 @@ void loop() {
     soilHum = constrain(soilHum, 0, 100);
 
     String json = "{";
-    json += "\"dhtTemp\":" + String(dhtTemp, 1) + ",";
-    json += "\"ahtHum\":" + String(humidity.relative_humidity, 1) + ",";
-    json += "\"bmpPress\":" + String(bmpPress, 1) + ",";
-    json += "\"soilHum\":" + String(soilHum, 1);
+    json += "\"DHT11\":{\"temp\":" + String(dhtTemp, 1) + "},";
+    json += "\"AHT20\":{\"hum\":" + String(humidity.relative_humidity, 1) + "},";
+    json += "\"BMP280\":{\"press\":" + String(bmpPress, 1) + "},";
+    json += "\"SOIL\":{\"hum\":" + String(soilHum, 1) + "}";
     json += "}";
 
     Serial.println("Надсилаю дані...");
