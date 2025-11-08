@@ -12,7 +12,6 @@
 #define SOIL_PIN A0 
 
 DHT dht(DHTPIN, DHTTYPE);
-
 Adafruit_AHTX0 aht;
 Adafruit_BMP280 bmp;
 
@@ -24,22 +23,21 @@ const unsigned long sendInterval = 10000;  // 10 секунд
 
 void setup() {
   Serial.begin(9600);
-  while (!Serial);
 
   Serial.println("Підключення до WiFi...");
   WiFi.begin(WIFI_SSID, WIFI_PASS);
   while (WiFi.status() != WL_CONNECTED) {
     Serial.print(".");
   }
-  Serial.println("\n✅ WiFi підключено!");
+  Serial.println("\nWiFi підключено!");
 
   dht.begin();
 
   if (!aht.begin()) Serial.println("⚠️ AHT20 не знайдено!");
-  else Serial.println("✅ AHT20 підключено!");
+  else Serial.println("AHT20 підключено!");
 
   if (!bmp.begin(0x77)) Serial.println("⚠️ BMP280 не знайдено!");
-  else Serial.println("✅ BMP280 підключено!");
+  else Serial.println("BMP280 підключено!");
 }
 
 void loop() {
@@ -53,12 +51,10 @@ void loop() {
     prevSendTime = millis();
 
     float dhtTemp = dht.readTemperature();
-    float dhtHum = dht.readHumidity();
 
     sensors_event_t humidity, temp;
     aht.getEvent(&humidity, &temp);
 
-    float bmpTemp = bmp.readTemperature();
     float bmpPress = bmp.readPressure() / 100.0F;
 
     int soilValue = analogRead(SOIL_PIN);
@@ -67,15 +63,12 @@ void loop() {
 
     String json = "{";
     json += "\"dhtTemp\":" + String(dhtTemp, 1) + ",";
-    json += "\"dhtHum\":" + String(dhtHum, 1) + ",";
-    json += "\"ahtTemp\":" + String(temp.temperature, 1) + ",";
     json += "\"ahtHum\":" + String(humidity.relative_humidity, 1) + ",";
-    json += "\"bmpTemp\":" + String(bmpTemp, 1) + ",";
     json += "\"bmpPress\":" + String(bmpPress, 1) + ",";
     json += "\"soilHum\":" + String(soilHum, 1);
     json += "}";
 
-    Serial.println("🌱 Надсилаю дані...");
+    Serial.println("Надсилаю дані...");
     Serial.println(json);
 
     client.beginRequest();
