@@ -3,10 +3,23 @@
 #include <ArduinoHttpClient.h>
 #include "pass.h"
 
+#include <DHT.h>
+#include <Wire.h>
+#include <Adafruit_AHTX0.h>
+#include <Adafruit_BMP280.h>
+
+#define DHTPIN 2
+#define DHTTYPE DHT11
+#define SOIL_PIN A0
+
+DHT dht(DHTPIN, DHTTYPE);
+Adafruit_AHTX0 aht;
+Adafruit_BMP280 bmp;
+
 using namespace websockets;
 
 WebsocketsClient wsClient;
-WiFiClient wifi;
+WiFiClient wifi;  // це для 443 WiFiSSLClient а для 80 WiFiClient wifi;
 HttpClient http(wifi, SERVER_HOST, SERVER_PORT);
 
 unsigned long prevSendTime = 0;
@@ -34,10 +47,7 @@ void loop() {
 }
 
 void onMessage(WebsocketsMessage msg) {
-  String payload = msg.data();
-  Serial.println("📩 Команда від сервера: " + payload);
-
-  if (payload == "REFRESH") {
+  if (msg.data() == "REFRESH") {
     sendSensorData();
   }
 }
