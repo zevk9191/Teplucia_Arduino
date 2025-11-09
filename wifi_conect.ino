@@ -1,98 +1,81 @@
 #include <WiFiS3.h>
+#include <ArduinoWebsockets.h>
 #include <ArduinoHttpClient.h>
 #include "pass.h"
 
-#include <DHT.h>
-#include <Wire.h>
-#include <Adafruit_AHTX0.h>
-#include <Adafruit_BMP280.h>
+using namespace websockets;
 
-#define DHTPIN 2
-#define DHTTYPE DHT11
-#define SOIL_PIN A0
-
-DHT dht(DHTPIN, DHTTYPE);
-Adafruit_AHTX0 aht;
-Adafruit_BMP280 bmp;
-
-WiFiClient wifi;  // це для 443 WiFiSSLClient а для 80 WiFiClient wifi;
-HttpClient client(wifi, SERVER_HOST, SERVER_PORT);
+WebsocketsClient wsClient;
+WiFiClient wifi;
+HttpClient http(wifi, SERVER_HOST, SERVER_PORT);
 
 unsigned long prevSendTime = 0;
-const unsigned long sendInterval = 10000;  // 10 секунд
+const unsigned long sendInterval = 600000; // 10 хвилин
 
 void setup() {
   Serial.begin(9600);
-
-  Serial.println("Підключення до WiFi...");
   WiFi.begin(WIFI_SSID, WIFI_PASS);
-  while (WiFi.status() != WL_CONNECTED) {
-    Serial.print(".");
-  }
-  Serial.println("\nWiFi підключено!");
+  while (WiFi.status() != WL_CONNECTED) delay(500);
 
-  dht.begin();
+  wsClient.onMessage(onMessage);
+  wsClient.connect(SERVER_WS); // наприклад ws://your-server-ip:3000
+  wsClient.send("HELLO_FROM_ARDUINO");
 
-  if (!aht.begin()) Serial.println("⚠️ AHT20 не знайдено!");
-  else Serial.println("AHT20 підключено!");
-
-  if (!bmp.begin(0x77)) Serial.println("⚠️ BMP280 не знайдено!");
-  else Serial.println("BMP280 підключено!");
+  Serial.println("✅ WebSocket підключено");
 }
 
 void loop() {
-  if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("⚠️ Втрата WiFi — перепідключення...");
-    WiFi.begin(WIFI_SSID, WIFI_PASS);
-    return;
-  }
+  wsClient.poll(); // підтримує зв’язок активним
 
   if (millis() - prevSendTime >= sendInterval) {
     prevSendTime = millis();
-
-    float dhtTemp = dht.readTemperature();
-
-    sensors_event_t humidity, temp;
-    aht.getEvent(&humidity, &temp);
-
-    float bmpPress = bmp.readPressure() / 100.0F;
-
-    int soilValue = analogRead(SOIL_PIN);
-    float soilHum = map(soilValue, 1023, 200, 0, 100);
-    soilHum = constrain(soilHum, 0, 100);
-
-    String json = "{";
-    json += "\"DHT11\":{\"temp\":" + String(dhtTemp, 1) + "},";
-    json += "\"AHT20\":{\"hum\":" + String(humidity.relative_humidity, 1) + "},";
-    json += "\"BMP280\":{\"press\":" + String(bmpPress, 1) + "},";
-    json += "\"SOIL\":{\"hum\":" + String(soilHum, 1) + "}";
-    json += "}";
-
-    Serial.println("Надсилаю дані...");
-    Serial.println(json);
-
-    client.beginRequest();
-    client.post(SERVER_PATH);
-    client.sendHeader("x-device-key", DEVICE_API_KEY);
-    client.sendHeader("Content-Type", "application/json");
-    client.sendHeader("Content-Length", json.length());
-    client.beginBody();
-    client.print(json);
-    client.endRequest();
-
-    int statusCode = client.responseStatusCode();
-    String response = "";
-    while (client.available()) {
-      char c = client.read();
-      response += c;
-    }
-
-    Serial.print("Код відповіді: ");
-    Serial.println(statusCode);
-    Serial.print("Відповідь: ");
-    Serial.println(response);
-    Serial.println("------");
-
-    client.stop();
+    sendSensorData();
   }
+}
+
+void onMessage(WebsocketsMessage msg) {
+  String payload = msg.data();
+  Serial.println("📩 Команда від сервера: " + payload);
+
+  if (payload == "REFRESH") {
+    sendSensorData();
+  }
+}
+
+// ----------- функція надсилання даних ----------
+void sendSensorData() {
+  WiFiClient wifi;
+  HttpClient client(wifi, SERVER_HOST, 3000);
+
+  float dhtTemp = dht.readTemperature();
+  sensors_event_t humidity, temp;
+  aht.getEvent(&humidity, &temp);
+  float bmpPress = bmp.readPressure() / 100.0F;
+  int soilValue = analogRead(SOIL_PIN);
+  float soilHum = map(soilValue, 1023, 200, 0, 100);
+  soilHum = constrain(soilHum, 0, 100);
+
+  String json = "{";
+  json += "\"DHT11\":{\"temp\":" + String(dhtTemp, 1) + "},";
+  json += "\"AHT20\":{\"hum\":" + String(humidity.relative_humidity, 1) + "},";
+  json += "\"BMP280\":{\"press\":" + String(bmpPress, 1) + "},";
+  json += "\"SOIL\":{\"hum\":" + String(soilHum, 1) + "}";
+  json += "}";
+
+  Serial.println("📤 Надсилаю дані...");
+  Serial.println(json);
+
+  client.beginRequest();
+  client.post("/api/sensors");
+  client.sendHeader("Content-Type", "application/json");
+  client.sendHeader("Content-Length", json.length());
+  client.beginBody();
+  client.print(json);
+  client.endRequest();
+
+  int statusCode = client.responseStatusCode();
+  Serial.print("Код відповіді: ");
+  Serial.println(statusCode);
+
+  client.stop();
 }
