@@ -73,6 +73,7 @@ void loop() {
 
     client.beginRequest();
     client.post(SERVER_PATH);
+    client.sendHeader("x-device-key", DEVICE_API_KEY);
     client.sendHeader("Content-Type", "application/json");
     client.sendHeader("Content-Length", json.length());
     client.beginBody();
