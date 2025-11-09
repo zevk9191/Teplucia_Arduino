@@ -20,25 +20,30 @@ using namespace websockets;
 
 WebsocketsClient wsClient;
 WiFiClient wifi;  // це для 443 WiFiSSLClient а для 80 WiFiClient wifi;
-HttpClient http(wifi, SERVER_HOST, SERVER_PORT);
+HttpClient client(wifi, SERVER_HOST, SERVER_PORT);
 
 unsigned long prevSendTime = 0;
-const unsigned long sendInterval = 600000; // 10 хвилин
+const unsigned long sendInterval = 600000;  // 10 хвилин
+
+void connectWiFi() {
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  if (WiFi.status() == WL_CONNECTED) Serial.println("WiFi підключено!");
+}
 
 void setup() {
   Serial.begin(9600);
-  WiFi.begin(WIFI_SSID, WIFI_PASS);
-  while (WiFi.status() != WL_CONNECTED) delay(500);
+  connectWiFi();
 
   wsClient.onMessage(onMessage);
-  wsClient.connect(SERVER_WS); // наприклад ws://your-server-ip:3000
+  wsClient.connect(SERVER_WS);  // наприклад ws://your-server-ip:3000
   wsClient.send("HELLO_FROM_ARDUINO");
 
   Serial.println("✅ WebSocket підключено");
 }
 
 void loop() {
-  wsClient.poll(); // підтримує зв’язок активним
+  connectWiFi();
+  wsClient.poll();  // підтримує зв’язок активним
 
   if (millis() - prevSendTime >= sendInterval) {
     prevSendTime = millis();
@@ -54,13 +59,13 @@ void onMessage(WebsocketsMessage msg) {
 
 // ----------- функція надсилання даних ----------
 void sendSensorData() {
-  WiFiClient wifi;
-  HttpClient client(wifi, SERVER_HOST, 3000);
-
   float dhtTemp = dht.readTemperature();
+
   sensors_event_t humidity, temp;
   aht.getEvent(&humidity, &temp);
+
   float bmpPress = bmp.readPressure() / 100.0F;
+
   int soilValue = analogRead(SOIL_PIN);
   float soilHum = map(soilValue, 1023, 200, 0, 100);
   soilHum = constrain(soilHum, 0, 100);
@@ -72,20 +77,27 @@ void sendSensorData() {
   json += "\"SOIL\":{\"hum\":" + String(soilHum, 1) + "}";
   json += "}";
 
-  Serial.println("📤 Надсилаю дані...");
+  Serial.println("Надсилаю дані.");
   Serial.println(json);
 
   client.beginRequest();
-  client.post("/api/sensors");
+  client.post(SERVER_PATH);
+  client.sendHeader("x-device-key", DEVICE_API_KEY);
   client.sendHeader("Content-Type", "application/json");
   client.sendHeader("Content-Length", json.length());
   client.beginBody();
   client.print(json);
   client.endRequest();
 
-  int statusCode = client.responseStatusCode();
+  String response = "";
+  while (client.available()) {
+    response += client.read();
+  }
   Serial.print("Код відповіді: ");
-  Serial.println(statusCode);
+  Serial.println(client.responseStatusCode());
+  Serial.print("Відповідь: ");
+  Serial.println(response);
+  Serial.println("------");
 
   client.stop();
 }
