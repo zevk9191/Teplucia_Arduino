@@ -1,5 +1,4 @@
 #include <WiFiS3.h>
-#include <ArduinoWebsockets.h>
 #include <ArduinoHttpClient.h>
 #include "pass.h"
 
@@ -16,14 +15,11 @@ DHT dht(DHTPIN, DHTTYPE);
 Adafruit_AHTX0 aht;
 Adafruit_BMP280 bmp;
 
-using namespace websockets;
-
-WebsocketsClient wsClient;
-WiFiClient wifi;  // це для 443 WiFiSSLClient а для 80 WiFiClient wifi;
+WiFiSSLClient wifi;  // це для 443 WiFiSSLClient а для 80 WiFiClient wifi;
 HttpClient client(wifi, SERVER_HOST, SERVER_PORT);
 
 unsigned long prevSendTime = 0;
-const unsigned long sendInterval = 600000;  // 10 хвилин
+const unsigned long sendInterval = 10000;  // 10 секунд
 
 void connectWiFi() {
   WiFi.begin(WIFI_SSID, WIFI_PASS);
@@ -32,30 +28,32 @@ void connectWiFi() {
 
 void setup() {
   Serial.begin(9600);
-  connectWiFi();
+  dht.begin();
+  aht.begin();
+  bmp.begin(0x77);
 
-  wsClient.onMessage(onMessage);
-  wsClient.connect(SERVER_WS);  // наприклад ws://your-server-ip:3000
-  wsClient.send("HELLO_FROM_ARDUINO");
+  // wsClient.onMessage(onMessage);
+  // wsClient.connect(SERVER_WS);  // наприклад ws://your-server-ip:3000
+  // wsClient.send("HELLO_FROM_ARDUINO");
 
-  Serial.println("✅ WebSocket підключено");
+  // Serial.println("✅ WebSocket підключено");
 }
 
 void loop() {
-  connectWiFi();
-  wsClient.poll();  // підтримує зв’язок активним
+  // wsClient.poll();  // підтримує зв’язок активним
 
   if (millis() - prevSendTime >= sendInterval) {
     prevSendTime = millis();
+    connectWiFi();
     sendSensorData();
   }
 }
 
-void onMessage(WebsocketsMessage msg) {
-  if (msg.data() == "REFRESH") {
-    sendSensorData();
-  }
-}
+// void onMessage(WebsocketsMessage msg) {
+//   if (msg.data() == "REFRESH") {
+//     sendSensorData();
+//   }
+// }
 
 // ----------- функція надсилання даних ----------
 void sendSensorData() {
@@ -77,7 +75,7 @@ void sendSensorData() {
   json += "\"SOIL\":{\"hum\":" + String(soilHum, 1) + "}";
   json += "}";
 
-  Serial.println("Надсилаю дані.");
+  Serial.println("Надсилаю дані...");
   Serial.println(json);
 
   client.beginRequest();
@@ -89,12 +87,15 @@ void sendSensorData() {
   client.print(json);
   client.endRequest();
 
+  int statusCode = client.responseStatusCode();
   String response = "";
   while (client.available()) {
-    response += client.read();
+    char c = client.read();
+    response += c;
   }
+
   Serial.print("Код відповіді: ");
-  Serial.println(client.responseStatusCode());
+  Serial.println(statusCode);
   Serial.print("Відповідь: ");
   Serial.println(response);
   Serial.println("------");
