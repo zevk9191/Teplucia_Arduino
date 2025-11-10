@@ -15,7 +15,7 @@ DHT dht(DHTPIN, DHTTYPE);
 Adafruit_AHTX0 aht;
 Adafruit_BMP280 bmp;
 
-WiFiSSLClient wifi;  // це для 443 WiFiSSLClient а для 80 WiFiClient wifi;
+WiFiClient wifi;  // це для 443 WiFiSSLClient а для 80 WiFiClient wifi;
 HttpClient client(wifi, SERVER_HOST, SERVER_PORT);
 
 unsigned long prevSendTime = 0;
@@ -26,36 +26,6 @@ void connectWiFi() {
   if (WiFi.status() == WL_CONNECTED) Serial.println("WiFi підключено!");
 }
 
-void setup() {
-  Serial.begin(9600);
-  dht.begin();
-  aht.begin();
-  bmp.begin(0x77);
-
-  // wsClient.onMessage(onMessage);
-  // wsClient.connect(SERVER_WS);  // наприклад ws://your-server-ip:3000
-  // wsClient.send("HELLO_FROM_ARDUINO");
-
-  // Serial.println("✅ WebSocket підключено");
-}
-
-void loop() {
-  // wsClient.poll();  // підтримує зв’язок активним
-
-  if (millis() - prevSendTime >= sendInterval) {
-    prevSendTime = millis();
-    connectWiFi();
-    sendSensorData();
-  }
-}
-
-// void onMessage(WebsocketsMessage msg) {
-//   if (msg.data() == "REFRESH") {
-//     sendSensorData();
-//   }
-// }
-
-// ----------- функція надсилання даних ----------
 void sendSensorData() {
   float dhtTemp = dht.readTemperature();
 
@@ -101,4 +71,20 @@ void sendSensorData() {
   Serial.println("------");
 
   client.stop();
+}
+
+void setup() {
+  Serial.begin(9600);
+  dht.begin();
+  aht.begin();
+  bmp.begin(0x77);
+  connectWiFi();
+}
+
+void loop() {
+  if (millis() - prevSendTime >= sendInterval) {
+    prevSendTime = millis();
+    if (WiFi.status() != WL_CONNECTED) connectWiFi();
+    sendSensorData();
+  }
 }
