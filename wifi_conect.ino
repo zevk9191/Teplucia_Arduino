@@ -40,9 +40,9 @@ void sendSensorData() {
 
   String json = "{";
   json += "\"DHT11\":{\"temp\":" + String(dhtTemp, 1) + "},";
-  json += "\"AHT20\":{\"hum\":" + String(humidity.relative_humidity, 1) + "},";
+  json += "\"AHT20\":{\"humAir\":" + String(humidity.relative_humidity, 1) + "},";
   json += "\"BMP280\":{\"press\":" + String(bmpPress, 1) + "},";
-  json += "\"SOIL\":{\"hum\":" + String(soilHum, 1) + "}";
+  json += "\"SOIL\":{\"humSoil\":" + String(soilHum, 1) + "}";
   json += "}";
 
   Serial.println("Надсилаю дані...");
